@@ -160,7 +160,7 @@ if uploaded_file:
 
         )
         st.header("Single mutations heatmap")
-        st.markdown(f"Wild-type mean: **{wt_mean}**")
+        st.markdown(f"Wild-type mean: **{wt_mean:.4f}**")
         st.altair_chart(hm)
 
     elif heatmap == 'PEG':
@@ -277,5 +277,5 @@ if uploaded_file:
 
         )
         st.header("Single mutations heatmap")
-        st.markdown(f"Wild-type mean: **{wt_mean}**")
+        st.markdown(f"Wild-type mean: **{wt_mean:.4f}**")
         st.altair_chart(hm)
