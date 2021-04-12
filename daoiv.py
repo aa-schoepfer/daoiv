@@ -57,8 +57,8 @@ def build_df(df,heatmap, amplification_factor):
     elif amplification_factor == 'Size/OD':
         amp_factors = count_cells / ceil_cells
 
-    elif amplification_factor == 'Size*Sample':
-        amp_factors = count_cells * ( ( take_cells /ceil_cells ) * ceil_cells )
+    elif amplification_factor == 'Size/Sample':
+        amp_factors = count_cells / ( ( take_cells /ceil_cells ) * ceil_cells )
 
     else:
         st.error(f"Normalization \"{amplification_factor}\" not found.")
@@ -230,7 +230,7 @@ if uploaded_file:
         df = pd.read_csv(uploaded_file)
 
     heatmap = st.radio('Subset', ['Expression','PEG'])
-    amplification_factor = st.radio('Normalization', ['Size','Size/OD','Size*Sample'])
+    amplification_factor = st.radio('Normalization', ['Size','Size/OD','Size/Sample'])
     aa_order = st.radio('Sort AA', ['1','A'])
 
     single_muts, wt, wt_mean = build_df(df,heatmap, amplification_factor)
