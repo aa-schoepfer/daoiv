@@ -31,6 +31,7 @@ def build_df(df,heatmap, amplification_factor):
         count_cells = np.array([16709793,3754589,2834337,2249482])
         expr_scs  = min_max_norm(np.array([450,3500,9000,20000])) + 1
         take_cells = 4e7
+        total_reads = [32964833,30377459,25372847,29016725]
         bins_filter = f"{bin_column} <= 4"
 
         af_sub = 1
@@ -42,6 +43,7 @@ def build_df(df,heatmap, amplification_factor):
         count_cells = np.array([187000,230000,340426,506977,969420])
         expr_scs  = np.array([.0,.05,.1,.15,.2]) + 1
         take_cells = 4e7
+        total_reads = [16868280,22768756,10776556,16724952,23342164]
         bins_filter = f"{bin_column}%2 == 0 and {bin_column} > 4"
 
         af_sub = 6
@@ -57,8 +59,8 @@ def build_df(df,heatmap, amplification_factor):
     elif amplification_factor == 'Size/OD':
         amp_factors = count_cells / ceil_cells
 
-    elif amplification_factor == 'Size/Sample':
-        amp_factors = count_cells / ( ( take_cells /ceil_cells ) * ceil_cells )
+    elif amplification_factor == 'Size/Reads':
+        amp_factors = count_cells / total_reads
 
     else:
         st.error(f"Normalization \"{amplification_factor}\" not found.")
@@ -229,9 +231,18 @@ if uploaded_file:
     else:
         df = pd.read_csv(uploaded_file)
 
-    heatmap = st.radio('Subset', ['Expression','PEG'])
-    amplification_factor = st.radio('Normalization', ['Size','Size/OD','Size/Sample'])
-    aa_order = st.radio('Sort AA', ['1','A'])
+    heatmap = st.sidebar.radio('Subset', ['Expression','PEG'])
+    
+    st.sidebar.write("""
+        **Normalizations**:
+        - Size:\t\tIllumina Reads * Cell count before amplification
+        - Size/OD:\t\tIllumina Reads * Cell count / OD after amplification  
+        - Size/Reads\t\tIllumina Reads * Cell count / Total Ill. reads
+    """)
+
+    amplification_factor = st.sidebar.radio('Normalization', ['Size','Size/OD','Size/Reads'])
+
+    aa_order = st.sidebar.radio('Sort AA', ['1','A'])
 
     single_muts, wt, wt_mean = build_df(df,heatmap, amplification_factor)
 
