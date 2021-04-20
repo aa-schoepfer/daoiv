@@ -1,11 +1,13 @@
 #Title: DAOx Illumina visualizations
 #Author: Alexandre Schoepfer
-#Version: 12.04.2021
+#Version: 20.04.2021
 
 import numpy as np
 import pandas as pd
 import altair as alt
 import streamlit as st
+
+from moljs import mol_component
 
 aa_column  = 'aa_mutation'
 n_aa_column = 'n_aa_substitutions'
@@ -15,116 +17,11 @@ def up_f(types=['txt','csv','.xlsx']):
     up_file = st.file_uploader("Upload File",type=types)
     return up_file
 
-@st.cache()
-def build_df(df,heatmap, amplification_factor):
+def wt_plot(df):
     
-    global aa_column 
-    global n_aa_column 
-    global bin_column
-
-    if heatmap == 'Expression':
-        
-        def min_max_norm(data):
-            return (data - np.min(data)) / (np.max(data) - np.min(data))
-        
-        ceil_cells = np.array([7.6e7,5.2e7,4.8e7,3.7e7])
-        count_cells = np.array([16709793,3754589,2834337,2249482])
-        expr_scs  = min_max_norm(np.array([450,3500,9000,20000])) + 1
-        take_cells = 4e7
-        total_reads = [32964833,30377459,25372847,29016725]
-        bins_filter = f"{bin_column} <= 4"
-
-        af_sub = 1
-        af_div = 1
-    
-    elif heatmap == 'PEG':
-        
-        ceil_cells = np.array([8.9e7,8.9e7,5.8e7,7.6e7,9.2e7])
-        count_cells = np.array([187000,230000,340426,506977,969420])
-        expr_scs  = np.array([.0,.05,.1,.15,.2]) + 1
-        take_cells = 4e7
-        total_reads = [16868280,22768756,10776556,16724952,23342164]
-        bins_filter = f"{bin_column}%2 == 0 and {bin_column} > 4"
-
-        af_sub = 6
-        af_div = 2
-    
-    else:
-        st.error(f"Subset \"{heatmap}\" not found.")
-        st.stop()
-
-    if amplification_factor == 'Size':
-        amp_factors = count_cells
-    
-    elif amplification_factor == 'Size/OD':
-        amp_factors = count_cells / ceil_cells
-
-    elif amplification_factor == 'Size/Reads':
-        amp_factors = count_cells / total_reads
-
-    else:
-        st.error(f"Normalization \"{amplification_factor}\" not found.")
-        st.stop()
-
-    df = df.query(bins_filter)
-    m_df = df.fillna('wt').groupby([aa_column,n_aa_column,bin_column], as_index=False).sum()
-
-    wt = m_df.query(f"{aa_column} == 'wt'").sort_values(bin_column).copy()
-
-    wt['i_size'] =  wt['size']
-    wt['size'] = wt['size'] * amp_factors
-    wt['i_bin'] = wt[bin_column]
-    wt[bin_column] = expr_scs
-    wt = wt.assign(bin_score=lambda x: x[bin_column] * x['size'])
-
-    wt['bin_mean'] = wt['bin_score'].sum() / wt['size'].sum()
-
-    wt_mean = wt['bin_mean'].mean()
-
-    single_muts = m_df.query(f"{n_aa_column} == 1").sort_values(by=[aa_column,bin_column]).reset_index(drop=True)
-
-    single_muts['i_size'] = single_muts['size']
-    single_muts['i_bin'] = single_muts[bin_column]
-
-    single_muts['size'] = single_muts['size'].astype('float')
-    single_muts[bin_column] = single_muts[bin_column].astype('float')
-
-    for i in single_muts.index:
-            single_muts.at[i, 'size'] = single_muts.at[i, 'size'] * amp_factors[int( (single_muts.at[i, bin_column] - af_sub) / af_div )]
-            single_muts.at[i, bin_column] = expr_scs[int( (single_muts.at[i, bin_column] - af_sub) / af_div )]
-
-    single_muts = single_muts.assign(bin_score=lambda x: x[bin_column] * x['size'])      
-            
-    tm = single_muts[[aa_column,'i_size','size','bin_score']].groupby([aa_column],as_index=False).sum()
-    single_muts = single_muts.merge(tm, on=aa_column)
-
-    single_muts = single_muts.assign(bin_mean=lambda x: np.log2( ( x['bin_score_y'] / x['size_y']) / wt_mean ) )
-
-    waas = single_muts[aa_column].str.extract(r'(^[A-Z*][0-9]+)')[0].unique()
-    maas = single_muts[aa_column].str.extract(r'([A-Z*]$)')[0].unique()
-
-    all_muts = np.empty([len(waas) * len(maas)], dtype=object)
-
-    for i,waa in enumerate(waas):
-        for j,maa in enumerate(maas):
-            all_muts[i*len(maas)+j] = waa+maa
-            
-    single_muts = pd.DataFrame(data=all_muts, columns=[aa_column]).merge(single_muts, on=aa_column, how='left')
-
-    single_muts['wt_aa'] = single_muts[aa_column].str.extract(r'(^[A-Z*])')
-    single_muts['position'] = single_muts[aa_column].str.extract(r'([0-9]+)').astype(int)
-    single_muts['mutated_aa'] = single_muts[aa_column].str.extract(r'([A-Z*]$)')
-
-    single_muts['wt_t'] = single_muts.apply(lambda x: x['wt_aa'] if x['wt_aa'] == x['mutated_aa'] else '', axis=1)
-    single_muts['bin_mean'] = single_muts.apply(lambda x: 0 if x['wt_aa'] == x['mutated_aa'] else x['bin_mean'], axis=1)
-
-    return single_muts, wt, wt_mean
-
-def wt_plot(wt):
-    
-    base = alt.Chart(wt).mark_bar().encode(
-            x='i_bin:O'
-    )
+    base = alt.Chart(df).mark_bar().encode(
+            x='bin:O'
+    ).transform_filter(alt.FieldEqualPredicate(field=aa_column, equal='wt'))
 
     wtd = alt.hconcat(
         base.encode(
@@ -132,19 +29,21 @@ def wt_plot(wt):
         tooltip=['i_size']
         ).properties(title="Post Amp."), 
         base.encode(
-        y='size:Q',
-        tooltip=['size']
+        y='size_x:Q',
+        tooltip=['size_x']
         ).properties(title="Pre Amp."),  
     )
 
     return wtd
 
-
-def sm_plot(single_muts, aa_order):
+def sm_plot(df):
 
     global aa_column 
     global n_aa_column 
     global bin_column
+
+    global aa_order
+    global heatmap
 
     if aa_order == 'A':
         sort_order = ['*','A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
@@ -152,57 +51,54 @@ def sm_plot(single_muts, aa_order):
     elif aa_order == '1':
         sort_order = ['*','R','K','H','D','E','Q','N','S','T','Y','W','F','A','I','L','M','V','G','P','C']
 
+    if heatmap == 'Expression':
+        res = 'wt_bin_mean'
+        a_res = 'wt_coef'
+    
+    elif heatmap == 'PEG':
+        res = 'wt_coef'
+        a_res = 'wt_bin_mean'
+
     brush = alt.selection_interval(encodings=['x'])
     selector = alt.selection_single(empty='all', fields=[aa_column])
 
-    bar = alt.Chart(single_muts).mark_rect(color='grey').encode(
+    bar = alt.Chart(df).mark_rect(color='grey').encode(
     x = alt.X('position:O', axis=alt.Axis(labels = False, ticks=False))
-    ).properties(width=600).add_selection(brush)
+    ).properties(width=714).add_selection(brush)
 
-    base = alt.Chart(single_muts).encode(
+    base = alt.Chart(df).encode(
         x=alt.X('position:O'),
         y=alt.Y('mutated_aa:O', sort=sort_order),
+    ).transform_filter(
+        alt.FieldOneOfPredicate(field='mutated_aa',oneOf=sort_order)
     )
 
     muts = base.mark_rect().encode(
-        color=alt.Color('bin_mean:Q', scale=alt.Scale(scheme='redyellowblue', domainMid=0)),
-        tooltip = ['i_size_y',aa_column,'bin_mean'],
-        opacity=alt.condition(selector, alt.value(1), alt.value(0.2))
+        color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowgreen', domainMid=0, domain=[-df[res].max(),df[res].max()])),
+        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size'],
+        opacity=alt.condition(selector, alt.value(1), alt.value(0.05)),
     ).transform_filter(brush).add_selection(selector)
 
-    wt = base.mark_text().encode(
+    wtd = base.mark_text().encode(
         text='wt_t:O',
-        tooltip = [aa_column,'bin_mean'],
+        tooltip = [aa_column],
         color=alt.condition(selector, alt.ColorValue('#000000'), alt.ColorValue('#CCCCCC'))
-    ).transform_filter(brush).add_selection(alt.selection_single())
-
-    pts = base.mark_point().encode(
-        size=alt.Size('i_size_y:Q'),
-        color=alt.ColorValue('grey'),
-        opacity=alt.condition(selector, alt.value(1), alt.value(0.1)),
-        tooltip = ['i_size_y',aa_column,'bin_mean'],
-    ).transform_filter(brush).add_selection(alt.selection_single())
-
-    bar1 = alt.Chart(single_muts).mark_bar().encode(
-        x='i_bin:O',
-        y='i_size_x:Q',
-        tooltip = ['i_size_x','size_x'],
-    ).transform_filter(
-        selector
+    ).transform_filter(brush).transform_filter(
+        alt.FieldOneOfPredicate(field='wt_t',oneOf=sort_order)
     ).add_selection(alt.selection_single())
 
-    bar1 = alt.Chart(single_muts, title="Pre Amp.").mark_bar().encode(
-        x='i_bin:O',
+    bar1 = alt.Chart(df, title="Pre Amp.").mark_bar().encode(
+        x='bin:O',
         y='size_x:Q',
-        tooltip = ['size_x','i_size_x'],
+        tooltip = [aa_column,'size_x','i_size'],
     ).transform_filter(
         selector
     ).add_selection(alt.selection_single())
 
-    bar2 = alt.Chart(single_muts, title="Post Amp.").mark_bar().encode(
-        x='i_bin:O',
-        y='i_size_x:Q',
-        tooltip = ['i_size_x','size_x'],
+    bar2 = alt.Chart(df, title="Post Amp.").mark_bar().encode(
+        x='bin:O',
+        y='i_size:Q',
+        tooltip = [aa_column,'i_size','size_x'],
     ).transform_filter(
         selector
     ).add_selection(alt.selection_single())
@@ -210,7 +106,7 @@ def sm_plot(single_muts, aa_order):
     hm = alt.vconcat(
 
         bar,
-        muts + wt + pts,
+        muts + wtd,
         alt.hconcat(
             bar1,
             bar2
@@ -233,23 +129,15 @@ if uploaded_file:
 
     heatmap = st.sidebar.radio('Subset', ['Expression','PEG'])
     
-    st.sidebar.write("""
-        **Normalizations**:
-        - Size:\t\tIllumina Reads * Cell count before amplification
-        - Size/OD:\t\tIllumina Reads * Cell count / OD after amplification  
-        - Size/Reads\t\tIllumina Reads * Cell count / Total Ill. reads
-    """)
+    aa_order = st.sidebar.radio('Sort AA', ['A','1'], index=1)
 
-    amplification_factor = st.sidebar.radio('Normalization', ['Size','Size/OD','Size/Reads'])
-
-    aa_order = st.sidebar.radio('Sort AA', ['1','A'])
-
-    single_muts, wt, wt_mean = build_df(df,heatmap, amplification_factor)
-
-    wtd = wt_plot(wt)
+    wtd = wt_plot(df)
     st.header('Wild type')
     st.altair_chart(wtd)
 
-    hm = sm_plot(single_muts, aa_order)
+    hm = sm_plot(df)
     st.header("Single mutations heatmap")
     st.altair_chart(hm)
+
+    inpt = st.sidebar.text_input("Highlight residues, e.g. 50 or 50-60 or 50-60,300-310")
+    mol_component(inpt)
