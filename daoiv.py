@@ -127,17 +127,31 @@ if uploaded_file:
     else:
         df = pd.read_csv(uploaded_file)
 
-    heatmap = st.sidebar.radio('Subset', ['Expression','PEG'])
+    st.sidebar.subheader("Heatmap")
     
-    aa_order = st.sidebar.radio('Sort AA', ['A','1'], index=1)
+    heatmap = st.sidebar.radio("Subset", ['Expression','PEG'])
+    
+    aa_order = st.sidebar.radio("Sort AA", ['A','1'], index=1)
 
-    wtd = wt_plot(df)
-    st.header('Wild type')
+    wtd = wt_plot(df.query(f"{aa_column} == 'wt'"))
+    st.header("Wild type")
     st.altair_chart(wtd)
+
+    st.sidebar.subheader("Filters")
+    ex_lm = st.sidebar.number_input(f"Expression lower limit (Default: {df['wt_bin_mean'].min()})", value=df['wt_bin_mean'].min()-0.01)
+    ex_hm = st.sidebar.number_input(f"Expression higher limit (Default: {df['wt_bin_mean'].max()})", value=df['wt_bin_mean'].max()+0.01)
+    co_lm = st.sidebar.number_input(f"PEG Slope lower limit (Default: {df['wt_coef'].min()})", value=df['wt_coef'].min()-0.01)
+    co_hm = st.sidebar.number_input(f"PEG Slope higher limit (Default: {df['wt_coef'].max()})", value=df['wt_coef'].max()+0.01)
+    
+    df = df.query(f"wt_bin_mean >= {ex_lm}")
+    df = df.query(f"wt_bin_mean <= {ex_hm}")
+    df = df.query(f"wt_coef >= {co_lm}")
+    df = df.query(f"wt_coef <= {co_hm}")
 
     hm = sm_plot(df)
     st.header("Single mutations heatmap")
     st.altair_chart(hm)
 
     inpt = st.sidebar.text_input("Highlight residues, e.g. 50 or 50-60 or 50-60,300-310")
+    st.header("DAOx; PDB: 1c0p")
     mol_component(inpt)
