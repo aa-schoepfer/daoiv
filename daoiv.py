@@ -1,6 +1,6 @@
 #Title: DAOx Illumina visualizations
 #Author: Alexandre Schoepfer
-#Version: 21.04.2021
+#Version: 07.05.2021
 
 import numpy as np
 import pandas as pd
@@ -74,8 +74,8 @@ def sm_plot(df):
     )
 
     muts = base.mark_rect().encode(
-        color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowgreen', domainMid=0)),
-        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size'],
+        color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowblue', domainMid=0)),
+        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size','conf_e','conf_p','conf_t'],
         opacity=alt.condition(selector, alt.value(1), alt.value(0.05)),
     ).transform_filter(brush).add_selection(selector)
 
@@ -148,6 +148,10 @@ if uploaded_file:
     as_lm = st.sidebar.number_input(f"Pre amplification, frequency >= than", value=0)
     rs_lm = st.sidebar.number_input(f"Post amplification, frequency >= than", value=0)
 
+    ec_lm = st.sidebar.number_input(f"Expression confidence >= than", value=0)
+    ep_lm = st.sidebar.number_input(f"PEG confidence >= than", value=0)
+    et_lm = st.sidebar.number_input(f"Total confidence >= than", value=0)
+
     df = df.query(f"wt_bin_mean >= {ex_lm}")
     df = df.query(f"wt_bin_mean <= {ex_hm}")
     df = df.query(f"wt_coef >= {co_lm}")
@@ -157,6 +161,10 @@ if uploaded_file:
 
     df = df.query(f"tot_size_x >= {as_lm}")
     df = df.query(f"tot_i_size >= {rs_lm}")
+
+    df = df.query(f"conf_e >= {ec_lm}")
+    df = df.query(f"conf_p >= {ep_lm}")
+    df = df.query(f"conf_t >= {et_lm}")   
 
     hm = sm_plot(df)
     st.header(f"Single mutations heatmap for {heatmap}")
