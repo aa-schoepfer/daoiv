@@ -75,7 +75,7 @@ def sm_plot(df):
 
     muts = base.mark_rect().encode(
         color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowblue', domainMid=0)),
-        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size','conf_e','conf_p','conf_t'],
+        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size','e_conf','p_conf','t_conf'],
         opacity=alt.condition(selector, alt.value(1), alt.value(0.05)),
     ).transform_filter(brush).add_selection(selector)
 
@@ -162,9 +162,9 @@ if uploaded_file:
     df = df.query(f"tot_size_x >= {as_lm}")
     df = df.query(f"tot_i_size >= {rs_lm}")
 
-    df = df.query(f"conf_e >= {ec_lm}")
-    df = df.query(f"conf_p >= {ep_lm}")
-    df = df.query(f"conf_t >= {et_lm}")   
+    df = df.query(f"e_conf >= {ec_lm}")
+    df = df.query(f"p_conf >= {ep_lm}")
+    df = df.query(f"t_conf >= {et_lm}")   
 
     hm = sm_plot(df)
     st.header(f"Single mutations heatmap for {heatmap}")
