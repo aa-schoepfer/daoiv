@@ -25,13 +25,13 @@ def wt_plot(df):
 
     wtd = alt.hconcat(
         base.encode(
-        y='i_size:Q',
-        tooltip=['i_size']
-        ).properties(title="Post Amp."), 
-        base.encode(
         y='size_x:Q',
         tooltip=['size_x']
-        ).properties(title="Pre Amp."),  
+        ).properties(title="Pre Amp."),
+        base.encode(
+        y='i_size:Q',
+        tooltip=['i_size']
+        ).properties(title="Post Amp."),   
     )
 
     return wtd
@@ -54,10 +54,42 @@ def sm_plot(df):
     if heatmap == 'Expression':
         res = 'wt_bin_mean'
         a_res = 'wt_coef'
+        dm = 0
     
     elif heatmap == 'PEG':
         res = 'wt_coef'
         a_res = 'wt_bin_mean'
+        dm = 0
+    
+    elif heatmap == '0%':
+        res = 'bin_score_y'
+        a_res = 'wt_bin_mean'
+        df = df.query("(bin >= 5 and bin <= 6 ) or mutated_aa == wt_t")
+        dm = 1.101744 	
+
+    elif heatmap == '5%':
+        res = 'bin_score_y'
+        a_res = 'wt_bin_mean'
+        df = df.query("(bin >= 7 and bin <= 8 ) or mutated_aa == wt_t")
+        dm = 1.129350
+
+    elif heatmap == '10%':
+        res = 'bin_score_y'
+        a_res = 'wt_bin_mean'
+        df = df.query("(bin >= 9 and bin <= 10 ) or mutated_aa == wt_t")
+        dm = 1.219020
+
+    elif heatmap == '15%':
+        res = 'bin_score_y'
+        a_res = 'wt_bin_mean'
+        df = df.query("(bin >= 11 and bin <= 12 ) or mutated_aa == wt_t")
+        dm = 1.290426
+
+    elif heatmap == '20%':
+        res = 'bin_score_y'
+        a_res = 'wt_bin_mean'
+        df = df.query("(bin >= 13 and bin <= 14 ) or mutated_aa == wt_t")
+        dm = 1.528374
 
     brush = alt.selection_interval(encodings=['x'])
     selector = alt.selection_single(empty='all', fields=[aa_column])
@@ -74,8 +106,8 @@ def sm_plot(df):
     )
 
     muts = base.mark_rect().encode(
-        color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowblue', domainMid=0)),
-        tooltip = [aa_column,res,a_res,'wt_inte','r2','tot_size_x','tot_i_size','e_conf','p_conf','t_conf'],
+        color=alt.Color(f'{res}:Q', scale=alt.Scale(scheme='redyellowblue', domainMid=dm)),
+        tooltip = [aa_column,res,a_res,'wt_inte','r2','sum(size_x)','tot_size_x','sum(i_size)','tot_i_size','e_conf','p_conf','t_conf'],
         opacity=alt.condition(selector, alt.value(1), alt.value(0.05)),
     ).transform_filter(brush).add_selection(selector)
 
@@ -129,7 +161,7 @@ if uploaded_file:
 
     st.sidebar.subheader("Heatmap")
     
-    heatmap = st.sidebar.radio("Subset", ['Expression','PEG'])
+    heatmap = st.sidebar.radio("Subset", ['Expression','PEG','0%','5%','10%','15%','20%'])
     
     aa_order = st.sidebar.radio("Sort AA", ['A','1'], index=1)
 
@@ -145,8 +177,8 @@ if uploaded_file:
     in_lm = st.sidebar.number_input(f"PEG intercept lower limit (Default: {df['wt_inte'].min()})", value=df['wt_inte'].min()-0.01)
     in_hm = st.sidebar.number_input(f"PEG intercept higher limit (Default: {df['wt_inte'].max()})", value=df['wt_inte'].max()+0.01)
     
-    as_lm = st.sidebar.number_input(f"Pre amplification, frequency >= than", value=0)
-    rs_lm = st.sidebar.number_input(f"Post amplification, frequency >= than", value=0)
+    as_lm = st.sidebar.number_input(f"Pre amplification, total frequency >= than", value=0)
+    rs_lm = st.sidebar.number_input(f"Post amplification, total frequency >= than", value=0)
 
     ec_lm = st.sidebar.number_input(f"Expression confidence >= than", value=0)
     ep_lm = st.sidebar.number_input(f"PEG confidence >= than", value=0)
